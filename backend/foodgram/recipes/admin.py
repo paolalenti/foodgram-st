@@ -59,7 +59,10 @@ class RecipeIngredientInline(admin.TabularInline):
 @admin.register(Recipe)
 class RecipeAdmin(admin.ModelAdmin):
     # Отображение в списке
-    list_display = ('name', 'author', 'cooking_time', 'pub_date', 'favorites_count', 'shopping_cart_count')
+    list_display = (
+        'name', 'author', 'cooking_time',
+        'pub_date', 'favorites_count', 'shopping_cart_count'
+    )
 
     # Поиск
     search_fields = ('name', 'author__username', 'author__email')

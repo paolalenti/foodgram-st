@@ -2,7 +2,7 @@ from django.core.validators import RegexValidator
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from djoser.serializers import UserCreateSerializer
-from recipes.models import Ingredient, Recipe, RecipeIngredient, Favorite, ShoppingCart
+from recipes.models import Ingredient, Recipe, RecipeIngredient
 from users.models import Subscription
 
 User = get_user_model()
@@ -29,17 +29,24 @@ class Base64ImageField(serializers.ImageField):
             ext = format.split('/')[-1]
             data = ContentFile(base64.b64decode(imgstr), name=f'temp.{ext}')
             if data.size > 2 * 1024 * 1024:  # 2MB
-                raise serializers.ValidationError("Размер изображения не должен превышать 2MB")
+                raise serializers.ValidationError(
+                    "Размер изображения не должен превышать 2MB")
 
         return super().to_internal_value(data)
 
 
 class CustomUserCreateSerializer(UserCreateSerializer):
-    username = serializers.CharField(validators=[RegexValidator(r'^[\w.@+-]+\Z')], max_length=150)
+    username = serializers.CharField(
+        validators=[RegexValidator(r'^[\w.@+-]+\Z')],
+        max_length=150
+    )
 
     class Meta(UserCreateSerializer.Meta):
         model = User
-        fields = ('email', 'id', 'username', 'first_name', 'last_name', 'password')
+        fields = (
+            'email', 'id', 'username',
+            'first_name', 'last_name', 'password'
+        )
         extra_kwargs = {'password': {'write_only': True}}
 
 
@@ -54,14 +61,19 @@ class UserSerializer(serializers.ModelSerializer):
     def get_avatar(self, obj):
         if obj.avatar:
             request = self.context.get('request')
-            return request.build_absolute_uri(obj.avatar.url) if request else obj.avatar.url
+            return request.build_absolute_uri(obj.avatar.url) \
+                if request else obj.avatar.url
         return None
 
     def get_is_subscribed(self, obj):
         request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            return obj.following.filter(user=request.user).exists()
-        return False
+        if not request or not request.user.is_authenticated:
+            return False
+
+        return Subscription.objects.filter(
+            user=request.user,
+            author=obj
+        ).exists()
 
 
 class SetPasswordSerializer(serializers.Serializer):
@@ -86,7 +98,8 @@ class IngredientSerializer(serializers.ModelSerializer):
 class RecipeIngredientSerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField(source='ingredient.id')
     name = serializers.ReadOnlyField(source='ingredient.name')
-    measurement_unit = serializers.ReadOnlyField(source='ingredient.measurement_unit')
+    measurement_unit = serializers.ReadOnlyField(
+        source='ingredient.measurement_unit')
 
     class Meta:
         model = RecipeIngredient
@@ -127,13 +140,17 @@ class RecipeSerializer(serializers.ModelSerializer):
 
 class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
     name = serializers.CharField(required=True, max_length=256)
-    ingredients = serializers.JSONField(required=True, write_only=True)
+    ingredients = serializers.JSONField(
+        required=True,
+        write_only=True
+    )
     image = Base64ImageField(required=False)
     text = serializers.CharField(required=True)
     cooking_time = serializers.IntegerField(
         required=True, min_value=1,
         error_messages={
-            "min_value": 'Время приготовления должно быть не менее 1 минуты'
+            "min_value": 'Время приготовления должно быть не менее'
+                         ' 1 минуты'
         }
     )
 
@@ -147,17 +164,20 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
 
     def validate_ingredients(self, value):
         if not value:
-            raise serializers.ValidationError("Необходим хотя бы один ингредиент")
+            raise serializers.ValidationError("Необходим хотя бы один"
+                                              " ингредиент")
 
         for item in value:
             if 'id' not in item or 'amount' not in item:
                 raise serializers.ValidationError(
-                    "Каждый ингредиент должен содержать 'id' и 'amount'"
+                    "Каждый ингредиент должен содержать 'id' и "
+                    "'amount'"
                 )
 
         ingredient_ids = [item['id'] for item in value]
         if len(ingredient_ids) != len(set(ingredient_ids)):
-            raise serializers.ValidationError("Ингредиенты не должны повторяться")
+            raise serializers.ValidationError("Ингредиенты не должны"
+                                              " повторяться")
 
         # Проверка существования ингредиентов в базе
         existing_ids = set(Ingredient.objects.filter(
@@ -167,15 +187,24 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         missing_ids = set(ingredient_ids) - existing_ids
         if missing_ids:
             raise serializers.ValidationError(
-                f"Ингредиенты с ID {', '.join(map(str, missing_ids))} не существуют"
+                f"Ингредиенты с ID {', '.join(map(str, missing_ids))}"
+                f" не существуют"
             )
 
         # Проверка количества ингредиентов
         for item in value:
             amount = item['amount']
-            if not isinstance(amount, int) or amount < 1:
+            if not isinstance(amount, int):
+                if not amount.isdigit():
+                    raise serializers.ValidationError(
+                        f"Количество ингредиента ID {item['id']} "
+                        f"должно быть целым числом больше 0"
+                    )
+                amount = int(amount)
+            if amount < 1:
                 raise serializers.ValidationError(
-                    f"Количество ингредиента ID {item['id']} должно быть целым числом больше 0"
+                    f"Количество ингредиента ID {item['id']} "
+                    f"должно быть целым числом больше 0"
                 )
 
         return value
@@ -187,7 +216,7 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
             objs.append(RecipeIngredient(
                 recipe=recipe,
                 ingredient_id=ingredient['id'],
-                amount=ingredient['amount']
+                amount=int(ingredient['amount'])
             ))
         RecipeIngredient.objects.bulk_create(objs)
 
@@ -195,7 +224,8 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         cooking_time = data.get('cooking_time')
         if cooking_time and cooking_time < 1:
             raise serializers.ValidationError({
-                'cooking_time': 'Время приготовления должно быть не менее 1 минуты'
+                'cooking_time': 'Время приготовления должно быть не '
+                                'менее 1 минуты'
             })
 
         if self.context['request'].method == 'POST':
@@ -206,12 +236,17 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
 
             # Для PATCH проверяем наличие обязательных полей, кроме image
         if self.context['request'].method == 'PATCH':
-            required_fields = ['ingredients', 'name', 'text', 'cooking_time']
-            missing_fields = [field for field in required_fields if field not in data]
+            required_fields = [
+                'ingredients', 'name', 'text', 'cooking_time'
+            ]
+            missing_fields = [
+                field for field in required_fields if field not in data
+            ]
 
             if missing_fields:
                 raise serializers.ValidationError({
-                    'required_fields': f"При обновлении обязательны поля: {', '.join(missing_fields)}"
+                    'required_fields': f"При обновлении обязательны поля:"
+                                       f" {', '.join(missing_fields)}"
                 })
 
         return data

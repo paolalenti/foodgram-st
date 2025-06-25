@@ -30,7 +30,8 @@ class Recipe(models.Model):
         through='RecipeIngredient',
         verbose_name='Ингредиенты'
     )
-    cooking_time = models.PositiveSmallIntegerField('Время приготовления (мин)')
+    cooking_time = (models.
+                    PositiveSmallIntegerField('Время приготовления (мин)'))
     pub_date = models.DateTimeField('Дата публикации', auto_now_add=True)
 
     class Meta:

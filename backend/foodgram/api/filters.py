@@ -3,7 +3,9 @@ from recipes.models import Recipe, Ingredient
 
 
 class IngredientFilter(django_filters.FilterSet):
-    name = django_filters.CharFilter(field_name='name', lookup_expr='istartswith')
+    name = django_filters.CharFilter(
+        field_name='name', lookup_expr='istartswith'
+    )
 
     class Meta:
         model = Ingredient
@@ -11,8 +13,10 @@ class IngredientFilter(django_filters.FilterSet):
 
 
 class RecipeFilter(django_filters.FilterSet):
-    is_favorited = django_filters.NumberFilter(method='filter_is_favorited')
-    is_in_shopping_cart = django_filters.NumberFilter(method='filter_in_shopping_cart')
+    is_favorited = django_filters.NumberFilter(
+        method='filter_is_favorited')
+    is_in_shopping_cart = django_filters.NumberFilter(
+        method='filter_in_shopping_cart')
     author = django_filters.NumberFilter(field_name='author__id')
 
     class Meta:

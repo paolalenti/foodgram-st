@@ -1,14 +1,5 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-from django.core.files.storage import FileSystemStorage
-
-class CustomFileSystemStorage(FileSystemStorage):
-    def get_default_avatar_path(self):
-        return "users/avatars/default.png"  # Путь относительно MEDIA_ROOT
-
-    def delete_avatar(self, name):
-        if name != self.get_default_avatar_path():
-            super().delete(name)
 
 
 class User(AbstractUser):
@@ -27,8 +18,7 @@ class User(AbstractUser):
     avatar = models.ImageField(
         'Аватар',
         upload_to='users/avatars/',
-        storage=CustomFileSystemStorage(),
-        default='users/avatars/default.png',
+        default=None,
         blank=True,
         null=True
     )

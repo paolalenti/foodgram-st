@@ -6,7 +6,10 @@ from .models import User, Subscription
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
     # Отображаемые поля в списке пользователей
-    list_display = ('email', 'username', 'first_name', 'last_name', 'is_staff', 'is_active')
+    list_display = (
+        'email', 'username', 'first_name',
+        'last_name', 'is_staff', 'is_active'
+    )
 
     # Поля для поиска
     search_fields = ('email', 'username')
@@ -20,9 +23,11 @@ class CustomUserAdmin(UserAdmin):
     # Настройка полей на странице редактирования пользователя
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
-        ('Персональная информация', {'fields': ('username', 'first_name', 'last_name', 'avatar')}),
+        ('Персональная информация',
+         {'fields': ('username', 'first_name', 'last_name', 'avatar')}),
         ('Права доступа', {
-            'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
+            'fields': ('is_active', 'is_staff',
+                       'is_superuser', 'groups', 'user_permissions'),
         }),
         ('Важные даты', {'fields': ('last_login', 'date_joined')}),
     )
@@ -31,7 +36,10 @@ class CustomUserAdmin(UserAdmin):
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('email', 'username', 'first_name', 'last_name', 'password1', 'password2'),
+            'fields': (
+                'email', 'username', 'first_name',
+                'last_name', 'password1', 'password2'
+            ),
         }),
     )
 
