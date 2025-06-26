@@ -1,10 +1,10 @@
 from django.contrib import admin
+from django.db.models import Count
 
 from .models import (
     Recipe, Ingredient, RecipeIngredient,
     Favorite, ShoppingCart
 )
-from django.db.models import Count
 
 
 @admin.register(Ingredient)
@@ -22,7 +22,7 @@ class IngredientAdmin(admin.ModelAdmin):
     fields = ('name', 'measurement_unit')
 
     # Автоматическое предложение при вводе
-    search_help_text = "Поиск по названию ингредиента"
+    search_help_text = 'Поиск по названию ингредиента'
 
     # Оптимизация запросов
     list_select_related = True
@@ -33,11 +33,10 @@ class IngredientAdmin(admin.ModelAdmin):
 
     recipe_count.short_description = 'Используется в рецептах'
 
-    # Настройка формы
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
-        form.base_fields['name'].label = "Название ингредиента"
-        form.base_fields['measurement_unit'].label = "Единица измерения"
+        form.base_fields['name'].label = 'Название ингредиента'
+        form.base_fields['measurement_unit'].label = 'Единица измерения'
         return form
 
 
@@ -46,13 +45,14 @@ class RecipeIngredientInline(admin.TabularInline):
     extra = 1
     min_num = 1
     autocomplete_fields = ('ingredient',)
-    verbose_name = "Ингредиент"
-    verbose_name_plural = "Ингредиенты"
+    verbose_name = 'Ингредиент'
+    verbose_name_plural = 'Ингредиенты'
 
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj, **kwargs)
-        formset.form.base_fields['ingredient'].label_from_instance = lambda \
-            inst: f"{inst.name} ({inst.measurement_unit})"
+        formset.form.base_fields['ingredient'].label_from_instance = (
+            lambda inst: f'{inst.name} ({inst.measurement_unit})'
+        )
         return formset
 
 
@@ -66,7 +66,7 @@ class RecipeAdmin(admin.ModelAdmin):
 
     # Поиск
     search_fields = ('name', 'author__username', 'author__email')
-    search_help_text = "Поиск по названию рецепта, имени автора или email"
+    search_help_text = 'Поиск по названию рецепта, имени автора или email'
 
     # Фильтры
     list_filter = ('pub_date', 'cooking_time')
@@ -131,9 +131,9 @@ class RecipeAdmin(admin.ModelAdmin):
     # Настройка формы
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
-        form.base_fields['name'].label = "Название рецепта"
-        form.base_fields['text'].label = "Описание рецепта"
-        form.base_fields['cooking_time'].label = "Время приготовления (мин)"
+        form.base_fields['name'].label = 'Название рецепта'
+        form.base_fields['text'].label = 'Описание рецепта'
+        form.base_fields['cooking_time'].label = 'Время приготовления (мин)'
         return form
 
 
@@ -152,7 +152,7 @@ class RecipeIngredientAdmin(admin.ModelAdmin):
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
-        form.base_fields['amount'].label = "Количество"
+        form.base_fields['amount'].label = 'Количество'
         return form
 
 

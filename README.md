@@ -24,6 +24,8 @@ docker-compose.yml)
 
 ```
 SECRET_KEY='ksl1j=!iadt3-9#$5c3!9pi=0ipi-k2+9yqulr71n%iqj&*erf'
+DJANGO_DEBUG = True
+DJANGO_HOSTS = localhost, backend, 127.0.0.1
 
 POSTGRES_DB=foodgram_db
 POSTGRES_USER=postgres
