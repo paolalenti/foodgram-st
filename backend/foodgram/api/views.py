@@ -41,6 +41,8 @@ User = get_user_model()
 
 
 class UserViewSet(DjoserUserViewSet):
+    """CRUD для пользователя и создание/удаление подписок."""
+
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
@@ -165,6 +167,8 @@ class UserViewSet(DjoserUserViewSet):
 
 
 class RecipeShortLinkView(APIView):
+    """Получение короткой ссылки для рецепта."""
+
     permission_classes = [AllowAny]
 
     def get(self, request, pk=None):
@@ -184,6 +188,8 @@ class RecipeShortLinkView(APIView):
 
 
 class RecipeShortRedirectView(APIView):
+    """Перенаправление короткой ссылки на полный URL рецепта."""
+
     permission_classes = [AllowAny]
 
     def get(self, request, short_code):
@@ -215,6 +221,8 @@ class RecipeShortRedirectView(APIView):
 class IngredientViewSet(mixins.ListModelMixin,
                         mixins.RetrieveModelMixin,
                         viewsets.GenericViewSet):
+    """Работа с ингредиентами."""
+
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
     pagination_class = None
@@ -222,6 +230,8 @@ class IngredientViewSet(mixins.ListModelMixin,
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
+    """CRUD для рецептов, работа с избранным и корзиной."""
+
     http_method_names = [
         'get', 'post', 'patch', 'delete',
         'head', 'options'
@@ -276,63 +286,55 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
-    @action(detail=True,
-            methods=['post', 'delete'],
-            permission_classes=[IsAuthenticated])
+    @action(
+        detail=True,
+        methods=['post', 'delete'],
+        permission_classes=[IsAuthenticated])
     def favorite(self, request, pk=None):
-        recipe = self.get_object()
-        data = {'recipe': recipe.id}
-        serializer = FavoriteSerializer(
-            data=data, context={'request': request}
+        return self._handle_relation(
+            request,
+            pk=pk,
+            serializer_class=FavoriteSerializer,
+            model_class=Favorite,
+            not_found_message='Рецепта нет в избранном'
         )
 
-        if request.method == 'POST':
-            serializer.is_valid(raise_exception=True)
-            serializer.save(user=request.user)
-            return Response(
-                serializer.data, status=status.HTTP_201_CREATED
-            )
-
-        if request.method == 'DELETE':
-            if not Favorite.objects.filter(
-                    user=request.user, recipe=recipe
-            ).exists():
-                return Response(
-                    {'error': 'Рецепта нет в избранном'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            Favorite.objects.filter(
-                user=request.user, recipe=recipe
-            ).delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-
-    @action(detail=True,
-            methods=['post', 'delete'],
-            permission_classes=[IsAuthenticated])
+    @action(
+        detail=True,
+        methods=['post', 'delete'],
+        permission_classes=[IsAuthenticated]
+    )
     def shopping_cart(self, request, pk=None):
+        return self._handle_relation(
+            request,
+            pk=pk,
+            serializer_class=ShoppingCartSerializer,
+            model_class=ShoppingCart,
+            not_found_message='Рецепта нет в списке покупок'
+        )
+
+    def _handle_relation(
+            self, request, pk,
+            serializer_class, model_class,
+            not_found_message
+    ):
         recipe = self.get_object()
         data = {'recipe': recipe.id}
-        serializer = ShoppingCartSerializer(
-            data=data, context={'request': request}
-        )
+        serializer = serializer_class(data=data, context={'request': request})
 
         if request.method == 'POST':
             serializer.is_valid(raise_exception=True)
             serializer.save(user=request.user)
-            return Response(
-                serializer.data,
-                status=status.HTTP_201_CREATED
-            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         if request.method == 'DELETE':
-            if not ShoppingCart.objects.filter(
-                    user=request.user, recipe=recipe
-            ).exists():
+            if not (model_class.objects.
+                    filter(user=request.user, recipe=recipe).exists()):
                 return Response(
-                    {'error': 'Рецепта нет в списке покупок'},
+                    {'error': not_found_message},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            ShoppingCart.objects.filter(
+            model_class.objects.filter(
                 user=request.user, recipe=recipe
             ).delete()
             return Response(status=status.HTTP_204_NO_CONTENT)

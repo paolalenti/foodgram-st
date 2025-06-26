@@ -9,25 +9,18 @@ from .models import (
 
 @admin.register(Ingredient)
 class IngredientAdmin(admin.ModelAdmin):
-    # Отображение в списке
     list_display = ('name', 'measurement_unit', 'recipe_count')
 
-    # Поиск по названию
     search_fields = ('name',)
 
-    # Сортировка
     ordering = ('name',)
 
-    # Поля для редактирования
     fields = ('name', 'measurement_unit')
 
-    # Автоматическое предложение при вводе
     search_help_text = 'Поиск по названию ингредиента'
 
-    # Оптимизация запросов
     list_select_related = True
 
-    # Кастомное поле - количество рецептов
     def recipe_count(self, obj):
         return obj.recipe_amounts.count()
 
@@ -58,32 +51,24 @@ class RecipeIngredientInline(admin.TabularInline):
 
 @admin.register(Recipe)
 class RecipeAdmin(admin.ModelAdmin):
-    # Отображение в списке
     list_display = (
         'name', 'author', 'cooking_time',
         'pub_date', 'favorites_count', 'shopping_cart_count'
     )
 
-    # Поиск
     search_fields = ('name', 'author__username', 'author__email')
     search_help_text = 'Поиск по названию рецепта, имени автора или email'
 
-    # Фильтры
     list_filter = ('pub_date', 'cooking_time')
 
-    # Сортировка
     ordering = ('-pub_date',)
 
-    # Inline-редактирование
     inlines = (RecipeIngredientInline,)
 
-    # Автодополнение для автора
     autocomplete_fields = ('author',)
 
-    # Только для чтения
     readonly_fields = ('pub_date', 'favorites_count', 'shopping_cart_count')
 
-    # Группировка полей
     fieldsets = (
         ('Основная информация', {
             'fields': ('name', 'author', 'image')
@@ -99,19 +84,16 @@ class RecipeAdmin(admin.ModelAdmin):
         }),
     )
 
-    # Количество в избранном
     def favorites_count(self, obj):
         return obj.favorited_by.count()
 
     favorites_count.short_description = 'В избранном'
 
-    # Количество в корзинах покупок
     def shopping_cart_count(self, obj):
         return obj.in_shopping_carts.count()
 
     shopping_cart_count.short_description = 'В корзинах покупок'
 
-    # Оптимизация запросов
     def get_queryset(self, request):
         return super().get_queryset(request).annotate(
             _favorites_count=Count('favorited_by'),
@@ -128,7 +110,6 @@ class RecipeAdmin(admin.ModelAdmin):
 
     shopping_cart_count.admin_order_field = '_shopping_cart_count'
 
-    # Настройка формы
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
         form.base_fields['name'].label = 'Название рецепта'
@@ -160,16 +141,13 @@ class RecipeIngredientAdmin(admin.ModelAdmin):
 class FavoriteAdmin(admin.ModelAdmin):
     list_display = ('user', 'recipe')
 
-    # Автодополнение
     autocomplete_fields = ('user', 'recipe')
 
-    # Поиск
     search_fields = (
         'user__username', 'user__email',
         'recipe__name', 'recipe__author__username'
     )
 
-    # Оптимизация запросов
     list_select_related = ('user', 'recipe')
 
 
@@ -177,14 +155,11 @@ class FavoriteAdmin(admin.ModelAdmin):
 class ShoppingCartAdmin(admin.ModelAdmin):
     list_display = ('user', 'recipe')
 
-    # Автодополнение
     autocomplete_fields = ('user', 'recipe')
 
-    # Поиск
     search_fields = (
         'user__username', 'user__email',
         'recipe__name', 'recipe__author__username'
     )
 
-    # Оптимизация запросов
     list_select_related = ('user', 'recipe')

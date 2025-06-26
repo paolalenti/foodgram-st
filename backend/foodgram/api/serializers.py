@@ -1,5 +1,9 @@
+import base64
+
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
 from django.core.validators import RegexValidator
+
 
 from djoser.serializers import UserCreateSerializer
 
@@ -18,7 +22,44 @@ from users.models import Subscription
 User = get_user_model()
 
 
-class ShoppingCartSerializer(serializers.ModelSerializer):
+class BaseRelationSerializer(serializers.ModelSerializer):
+    """
+    Абстрактный базовый сериалайзер для работы с отношениями
+    между пользователями и рецептами.
+    """
+
+    class Meta:
+        model = None
+        fields = ['user', 'recipe']
+        extra_kwargs = {
+            'user': {'read_only': True},
+            'recipe': {'required': True}
+        }
+
+    def get_already_exists_message(self):
+        raise NotImplementedError(
+            'Метод должен возвращать сообщение об ошибке'
+        )
+
+    def validate_recipe(self, value):
+        user = self.context['request'].user
+        model_class = self.Meta.model
+
+        if model_class.objects.filter(user=user, recipe=value).exists():
+            raise (serializers.
+                   ValidationError(self.get_already_exists_message())
+                   )
+
+        return value
+
+    def to_representation(self, instance):
+        recipe = instance.recipe
+        return RecipeMinifiedSerializer(recipe, context=self.context).data
+
+
+class ShoppingCartSerializer(BaseRelationSerializer):
+    """Сериалайзер для работы с рецептом в списке покупок."""
+
     class Meta:
         model = ShoppingCart
         fields = ['user', 'recipe']
@@ -27,43 +68,28 @@ class ShoppingCartSerializer(serializers.ModelSerializer):
             'recipe': {'required': True}
         }
 
-    def validate_recipe(self, value):
-        user = self.context['request'].user
-        if ShoppingCart.objects.filter(user=user, recipe=value).exists():
-            raise serializers.ValidationError('Рецепт уже в списке покупок')
-        return value
-
-    def to_representation(self, instance):
-        recipe = instance.recipe
-        return RecipeMinifiedSerializer(
-            recipe, context=self.context
-        ).data
+    def get_already_exists_message(self):
+        return 'Рецепт уже в списке покупок'
 
 
-class FavoriteSerializer(serializers.ModelSerializer):
+class FavoriteSerializer(BaseRelationSerializer):
+    """Сериалайзер для работы с избранным."""
+
     class Meta:
         model = Favorite
-        fields = ('user', 'recipe')
+        fields = ['user', 'recipe']
         extra_kwargs = {
             'user': {'read_only': True},
             'recipe': {'required': True}
         }
 
-    def validate_recipe(self, value):
-        user = self.context['request'].user
-        if Favorite.objects.filter(user=user, recipe=value).exists():
-            raise (serializers.
-                   ValidationError('Рецепт уже в избранном'))
-        return value
-
-    def to_representation(self, instance):
-        recipe = instance.recipe
-        return RecipeMinifiedSerializer(
-            recipe, context=self.context
-        ).data
+    def get_already_exists_message(self):
+        return 'Рецепт уже в избранном'
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
+    """Сериалайзер для создания подписки на автора."""
+
     class Meta:
         model = Subscription
         fields = ('user', 'author')
@@ -89,6 +115,8 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
 
 class UserWithRecipesSerializer(serializers.ModelSerializer):
+    """Сериалайзер для отображения пользователя с его рецептами."""
+
     is_subscribed = serializers.SerializerMethodField()
     recipes = serializers.SerializerMethodField()
     recipes_count = serializers.IntegerField(
@@ -143,6 +171,8 @@ class UserWithRecipesSerializer(serializers.ModelSerializer):
 
 
 class RecipeMinifiedSerializer(serializers.ModelSerializer):
+    """Упрощённый сериалайзер для отображения рецепта."""
+
     class Meta:
         model = Recipe
         fields = ('id', 'name', 'image', 'cooking_time')
@@ -158,6 +188,8 @@ class RecipeMinifiedSerializer(serializers.ModelSerializer):
 
 
 class ShortCodeValidatorSerializer(serializers.Serializer):
+    """Валидирует короткий код для редиректа на рецепт."""
+
     short_code = serializers.CharField()
 
     def __init__(self, *args, **kwargs):
@@ -179,6 +211,8 @@ class ShortCodeValidatorSerializer(serializers.Serializer):
 
 
 class ShortLinkSerializer(serializers.Serializer):
+    """Сериалайзер для генерации короткой ссылки."""
+
     short_link = serializers.URLField(read_only=True)
 
     def to_representation(self, instance):
@@ -188,16 +222,14 @@ class ShortLinkSerializer(serializers.Serializer):
 
 
 class Base64ImageField(serializers.ImageField):
+    """Кастомное поле для работы с изображениями в формате Base64."""
 
     def to_internal_value(self, data):
-        import base64
-        from django.core.files.base import ContentFile
-
         if isinstance(data, str) and data.startswith('data:image'):
             format, imgstr = data.split(';base64,')
             ext = format.split('/')[-1]
             data = ContentFile(base64.b64decode(imgstr), name=f'temp.{ext}')
-            if data.size > 2 * 1024 * 1024:  # 2MB
+            if data.size > 2 * 1024 * 1024:
                 raise serializers.ValidationError(
                     'Размер изображения не должен превышать 2MB')
 
@@ -205,6 +237,8 @@ class Base64ImageField(serializers.ImageField):
 
 
 class CustomUserCreateSerializer(UserCreateSerializer):
+    """Сериалайзер для регистрации нового пользователя."""
+
     username = serializers.CharField(
         validators=[RegexValidator(r'^[\w.@+-]+\Z')],
         max_length=150
@@ -220,6 +254,8 @@ class CustomUserCreateSerializer(UserCreateSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    """Сериалайзер для отображения пользователя."""
+
     is_subscribed = serializers.SerializerMethodField()
 
     class Meta:
@@ -248,11 +284,15 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class SetPasswordSerializer(serializers.Serializer):
+    """Сериалайзер для изменения пароля пользователя."""
+
     current_password = serializers.CharField(required=True)
     new_password = serializers.CharField(required=True)
 
 
 class SetAvatarSerializer(serializers.ModelSerializer):
+    """Сериалайзер для смены аватара пользователя."""
+
     avatar = Base64ImageField(required=True)
 
     class Meta:
@@ -261,12 +301,16 @@ class SetAvatarSerializer(serializers.ModelSerializer):
 
 
 class IngredientSerializer(serializers.ModelSerializer):
+    """Сериалайзер для отображения ингредиента."""
+
     class Meta:
         model = Ingredient
         fields = ('id', 'name', 'measurement_unit')
 
 
 class RecipeIngredientSerializer(serializers.ModelSerializer):
+    """Сериалайзер для отображения ингредиента в рецепте."""
+
     id = serializers.ReadOnlyField(source='ingredient.id')
     name = serializers.ReadOnlyField(source='ingredient.name')
     measurement_unit = serializers.ReadOnlyField(
@@ -278,6 +322,8 @@ class RecipeIngredientSerializer(serializers.ModelSerializer):
 
 
 class RecipeSerializer(serializers.ModelSerializer):
+    """Основной сериалайзер для отображения рецепта."""
+
     author = UserSerializer(read_only=True)
     ingredients = RecipeIngredientSerializer(
         source='ingredient_amounts',
@@ -310,6 +356,8 @@ class RecipeSerializer(serializers.ModelSerializer):
 
 
 class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
+    """Сериалайзер для создания и обновления рецепта."""
+
     name = serializers.CharField(required=True, max_length=256)
     ingredients = serializers.JSONField(
         required=True,
@@ -402,7 +450,6 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
                     'image': 'Это поле обязательно при создании рецепта'
                 })
 
-            # Для PATCH проверяем наличие обязательных полей, кроме image
         if self.context['request'].method == 'PATCH':
             required_fields = [
                 'ingredients', 'name', 'text', 'cooking_time'
