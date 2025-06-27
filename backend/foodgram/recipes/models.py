@@ -77,8 +77,8 @@ class RecipeIngredient(models.Model):
         'Количество',
         validators=[
             MinValueValidator(1,
-                              message='Количество ингредиента '
-                                      'не может быть меньше 1'),
+                              message=('Количество ингредиента '
+                                       'не может быть меньше 1')),
         ]
     )
 

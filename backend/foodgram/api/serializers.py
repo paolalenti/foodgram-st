@@ -23,10 +23,7 @@ User = get_user_model()
 
 
 class BaseRelationSerializer(serializers.ModelSerializer):
-    """
-    Абстрактный базовый сериалайзер для работы с отношениями
-    между пользователями и рецептами.
-    """
+    """Абстрактный сериалайзер для отношений пользователь/рецепт."""
 
     class Meta:
         model = None
@@ -368,8 +365,8 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
     cooking_time = serializers.IntegerField(
         required=True, min_value=1,
         error_messages={
-            'min_value': 'Время приготовления должно быть не менее'
-                         ' 1 минуты'
+            'min_value': ('Время приготовления должно быть '
+                          'не менее 1 минуты')
         }
     )
 
@@ -440,8 +437,8 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         cooking_time = data.get('cooking_time')
         if cooking_time and cooking_time < 1:
             raise serializers.ValidationError({
-                'cooking_time': 'Время приготовления должно быть не '
-                                'менее 1 минуты'
+                'cooking_time': ('Время приготовления должно быть не '
+                                 'менее 1 минуты')
             })
 
         if self.context['request'].method == 'POST':

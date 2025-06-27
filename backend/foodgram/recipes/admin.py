@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.db.models import Count
+from django.db.models import Count, Prefetch
 
 from .models import (
     Recipe, Ingredient, RecipeIngredient,
@@ -10,19 +10,18 @@ from .models import (
 @admin.register(Ingredient)
 class IngredientAdmin(admin.ModelAdmin):
     list_display = ('name', 'measurement_unit', 'recipe_count')
-
     search_fields = ('name',)
-
     ordering = ('name',)
-
     fields = ('name', 'measurement_unit')
-
     search_help_text = 'Поиск по названию ингредиента'
 
-    list_select_related = True
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(
+            recipe_count=Count('recipe_amounts')
+        )
 
     def recipe_count(self, obj):
-        return obj.recipe_amounts.count()
+        return obj.recipe_count
 
     recipe_count.short_description = 'Используется в рецептах'
 
@@ -58,15 +57,10 @@ class RecipeAdmin(admin.ModelAdmin):
 
     search_fields = ('name', 'author__username', 'author__email')
     search_help_text = 'Поиск по названию рецепта, имени автора или email'
-
     list_filter = ('pub_date', 'cooking_time')
-
     ordering = ('-pub_date',)
-
     inlines = (RecipeIngredientInline,)
-
     autocomplete_fields = ('author',)
-
     readonly_fields = ('pub_date', 'favorites_count', 'shopping_cart_count')
 
     fieldsets = (
@@ -84,31 +78,34 @@ class RecipeAdmin(admin.ModelAdmin):
         }),
     )
 
-    def favorites_count(self, obj):
-        return obj.favorited_by.count()
-
-    favorites_count.short_description = 'В избранном'
-
-    def shopping_cart_count(self, obj):
-        return obj.in_shopping_carts.count()
-
-    shopping_cart_count.short_description = 'В корзинах покупок'
-
     def get_queryset(self, request):
-        return super().get_queryset(request).annotate(
-            _favorites_count=Count('favorited_by'),
-            _shopping_cart_count=Count('in_shopping_carts')
+        return (
+            super().get_queryset(request)
+            .select_related('author')
+            .prefetch_related(
+                Prefetch(
+                    'ingredient_amounts',
+                    queryset=RecipeIngredient.objects.select_related(
+                        'ingredient'
+                    )
+                )
+            ).annotate(
+                _favorites_count=Count('favorited_by'),
+                _shopping_cart_count=Count('in_shopping_carts')
+            )
         )
 
     def favorites_count(self, obj):
         return obj._favorites_count
 
     favorites_count.admin_order_field = '_favorites_count'
+    favorites_count.short_description = 'В избранном'
 
     def shopping_cart_count(self, obj):
         return obj._shopping_cart_count
 
     shopping_cart_count.admin_order_field = '_shopping_cart_count'
+    shopping_cart_count.short_description = 'В корзинах покупок'
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
@@ -124,7 +121,12 @@ class RecipeIngredientAdmin(admin.ModelAdmin):
     search_fields = ('recipe__name', 'ingredient__name')
     list_filter = ('ingredient__measurement_unit',)
     autocomplete_fields = ('recipe', 'ingredient')
-    list_select_related = ('recipe', 'ingredient')
+
+    def get_queryset(self, request):
+        return (
+            super().get_queryset(request)
+            .select_related('recipe', 'ingredient')
+        )
 
     def unit(self, obj):
         return obj.ingredient.measurement_unit
@@ -140,26 +142,36 @@ class RecipeIngredientAdmin(admin.ModelAdmin):
 @admin.register(Favorite)
 class FavoriteAdmin(admin.ModelAdmin):
     list_display = ('user', 'recipe')
-
     autocomplete_fields = ('user', 'recipe')
-
     search_fields = (
         'user__username', 'user__email',
         'recipe__name', 'recipe__author__username'
     )
 
-    list_select_related = ('user', 'recipe')
+    def get_queryset(self, request):
+        return (
+            super().get_queryset(request)
+            .select_related('user', 'recipe__author')
+            .prefetch_related(
+                Prefetch('recipe', queryset=Recipe.objects.only('name'))
+            )
+        )
 
 
 @admin.register(ShoppingCart)
 class ShoppingCartAdmin(admin.ModelAdmin):
     list_display = ('user', 'recipe')
-
     autocomplete_fields = ('user', 'recipe')
-
     search_fields = (
         'user__username', 'user__email',
         'recipe__name', 'recipe__author__username'
     )
 
-    list_select_related = ('user', 'recipe')
+    def get_queryset(self, request):
+        return (
+            super().get_queryset(request)
+            .select_related('user', 'recipe__author')
+            .prefetch_related(Prefetch(
+                'recipe', queryset=Recipe.objects.only('name'))
+            )
+        )

@@ -328,15 +328,16 @@ class RecipeViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         if request.method == 'DELETE':
-            if not (model_class.objects.
-                    filter(user=request.user, recipe=recipe).exists()):
+            deleted_count, _ = model_class.objects.filter(
+                user=request.user,
+                recipe=recipe
+            ).delete()
+            if deleted_count == 0:
                 return Response(
                     {'error': not_found_message},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            model_class.objects.filter(
-                user=request.user, recipe=recipe
-            ).delete()
+
             return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False,
