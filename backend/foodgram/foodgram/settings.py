@@ -8,8 +8,7 @@ load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = os.getenv('SECRET_KEY')
 
-debug_value = os.getenv('DJANGO_DEBUG').lower()
-DEBUG = debug_value in ('1', 'true', 't', 'yes', 'y', 'on')
+DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() in ('1', 'true', 't', 'yes', 'y', 'on')
 
 ALLOWED_HOSTS = os.getenv('DJANGO_HOSTS').split(', ')
 
@@ -58,7 +57,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'foodgram.wsgi.application'
 
-DATABASE_ENGINE = os.getenv('DATABASE_ENGINE')
+DATABASE_ENGINE = os.getenv('DATABASE_ENGINE', 'sqlite')
 
 if DATABASE_ENGINE == 'postgres':
     DATABASES = {
@@ -71,15 +70,13 @@ if DATABASE_ENGINE == 'postgres':
             'PORT': os.getenv('DB_PORT'),
         }
     }
-elif DATABASE_ENGINE == 'sqlite':
+else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-else:
-    raise ValueError(f"Неизвестный DATABASE_ENGINE: {DATABASE_ENGINE}")
 
 AUTH_PASSWORD_VALIDATORS = [
     {
