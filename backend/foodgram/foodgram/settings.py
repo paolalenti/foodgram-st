@@ -125,10 +125,20 @@ REST_FRAMEWORK = {
 
 AUTH_USER_MODEL = 'users.User'
 
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = '88ukut@gmail.com'
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
+
 DJOSER = {
     'TOKEN_MODEL': 'rest_framework.authtoken.models.Token',
     'LOGIN_FIELD': 'email',
     'HIDE_USERS': False,
+    'PASSWORD_RESET_CONFIRM_URL': 'api/users/reset_password_confirm?uid={uid}&token={token}',
+    'PASSWORD_CHANGED_EMAIL_CONFIRMATION': True,
+    'SEND_ACTIVATION_EMAIL': False,
     'SERIALIZERS': {
         'user_create': 'api.serializers.CustomUserCreateSerializer',
         'user': 'api.serializers.UserSerializer',
