@@ -6,6 +6,7 @@ on:
       - main
 
 jobs:
+
   tests:
     runs-on: ubuntu-latest
     # Блок services аналогичен docker-compose.yml
@@ -23,8 +24,10 @@ jobs:
         # В результате тесты опять решат, что базы нет, — и упадут
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
+
     - name: Check out code
       uses: actions/checkout@v4
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -35,9 +38,13 @@ jobs:
         cd backend/foodgram/
         python -m pip install --upgrade pip 
         pip install -r requirements.txt --no-cache-dir
-    # Этот шаг дополним переменными для доступа к БД
-    - name: Lint with flake8
-      # Добавляем env-переменные для доступа к БД
+
+    - name: Apply migrations
+      run: |
+        cd backend/foodgram/
+        python manage.py migrate
+
+    - name: Run tests
       env:
         POSTGRES_USER: django_user
         POSTGRES_PASSWORD: django_password
@@ -46,6 +53,11 @@ jobs:
         # Поэтому подключаемся к 127.0.0.1:5432
         DB_HOST: 127.0.0.1
         DB_PORT: 5432
+      run: |
+        cd backend/foodgram/
+        pytest
+
+    - name: Lint with flake8
       run: |
         flake8
 
