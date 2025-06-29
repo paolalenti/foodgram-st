@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Chat</title>
+</head>
+<body>
+    <h1>WebSocket Chat</h1>
+    <input type="text" id="messageInput" placeholder="Введите сообщение">
+    <button onclick="sendMessage()">Отправить</button>
+    <ul id="messages"></ul>
+
+    <h1>Статус пользователей</h1>
+    <ul id="userStatus"></ul>
+
+    <script>
+        const chatSocket = new WebSocket(
+            'ws://' + window.location.host + '/ws/chat/'
+        );
+
+        const statusSocket = new WebSocket(
+            'ws://' + window.location.host + '/ws/status/'
+        );
+
+        // Чат
+        chatSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            const li = document.createElement('li');
+            li.textContent = `${data.user}: ${data.message}`;
+            document.getElementById('messages').appendChild(li);
+        };
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            chatSocket.send(JSON.stringify({
+                message: input.value
+            }));
+            input.value = '';
+        }
+
+        // Статус пользователей
+        statusSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            const li = document.createElement('li');
+            if (data.status === "joined") {
+                li.textContent = `✅ ${data.user} подключился`;
+            } else if (data.status === "left") {
+                li.textContent = `❌ ${data.user} отключился`;
+            }
+            document.getElementById('userStatus').appendChild(li);
+        }
+    </script>
+</body>
+</html>
