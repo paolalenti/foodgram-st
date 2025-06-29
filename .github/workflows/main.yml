@@ -67,8 +67,6 @@ jobs:
         EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
       run: |
         cd backend/foodgram/
-        mkdir -p /app/media
-        chmod 777 /app/media
         pytest
 
     - name: Lint with flake8
