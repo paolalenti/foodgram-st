@@ -1,12 +1,19 @@
+import requests
+import secrets
+import random
+import string
+import logging
+
 from django.conf import settings
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, login
 from django.db.models import Count, Exists, OuterRef, Prefetch, Sum
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect, render
 
 from djoser.views import UserViewSet as DjoserUserViewSet
 
 from rest_framework import mixins, permissions, status, viewsets
+from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
 from rest_framework.permissions import (
     AllowAny,
@@ -37,7 +44,199 @@ from .serializers import (
 )
 
 
+logger = logging.getLogger(__name__)
+
 User = get_user_model()
+
+
+def github_login(request):
+    # Генерация уникального state
+    state = secrets.token_urlsafe(16)
+    request.session['github_oauth_state'] = state
+    request.session.save()  # Важно: сохраняем сессию
+
+    # Формирование URL для перенаправления
+    auth_url = (
+        f"{settings.GITHUB_AUTHORIZE_URL}?"
+        f"client_id={settings.GITHUB_CLIENT_ID}&"
+        f"redirect_uri={settings.GITHUB_REDIRECT_URI}&"
+        f"scope=user:email&"
+        f"state={state}"
+    )
+    return redirect(auth_url)
+
+
+def github_callback(request):
+    # Проверка state
+    saved_state = request.session.get('github_oauth_state')
+    if not saved_state or request.GET.get('state') != saved_state:
+        logger.error(
+            f"Invalid state: saved={saved_state},"
+            f" received={request.GET.get('state')}"
+        )
+        return HttpResponse('Invalid state parameter', status=400)
+
+    # Удаление использованного state
+    del request.session['github_oauth_state']
+    request.session.save()
+
+    # Получение кода
+    code = request.GET.get('code')
+    if not code:
+        return HttpResponse('No code provided', status=400)
+
+    # Создание сессии для сохранения cookies
+    session = requests.Session()
+
+    # Подготовка данных для запроса токена
+    token_data = {
+        'client_id': settings.GITHUB_CLIENT_ID,
+        'client_secret': settings.GITHUB_CLIENT_SECRET,
+        'code': code,
+        'redirect_uri': settings.GITHUB_REDIRECT_URI
+    }
+
+    headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    }
+
+    try:
+        # Запрос access token
+        token_response = session.post(
+            settings.GITHUB_TOKEN_URL,
+            json=token_data,
+            headers=headers
+        )
+
+        logger.debug(
+            f"Token response: {token_response.status_code} -"
+            f" {token_response.text}"
+        )
+
+        if token_response.status_code != 200:
+            return HttpResponse(
+                f"GitHub token error: {token_response.status_code} -"
+                f" {token_response.text}",
+                status=400
+            )
+
+        token_json = token_response.json()
+        access_token = token_json.get('access_token')
+
+        if not access_token:
+            return HttpResponse(
+                "Access token not found in response",
+                status=400
+            )
+
+        # Получение данных пользователя с использованием той же сессии
+        user_headers = {
+            'Authorization': f'token {access_token}',
+            'Accept': 'application/json'
+        }
+        user_response = session.get(
+            settings.GITHUB_USER_URL,
+            headers=user_headers
+        )
+
+        logger.debug(
+            f"User response: {user_response.status_code} - "
+            f"{user_response.text}"
+        )
+
+        if user_response.status_code != 200:
+            return HttpResponse(
+                f"GitHub user error: {user_response.status_code} - "
+                f"{user_response.text}",
+                status=400
+            )
+
+        user_data = user_response.json()
+
+        # Получение email
+        email = user_data.get('email')
+        if not email:
+            emails_response = session.get(
+                'https://api.github.com/user/emails',
+                headers=user_headers
+            )
+            if emails_response.status_code == 200:
+                emails = emails_response.json()
+                primary_emails = [
+                    e['email'] for e in emails
+                    if e.get('primary') and e.get('verified')
+                ]
+                if primary_emails:
+                    email = primary_emails[0]
+
+        if not email:
+            return HttpResponse(
+                "Email not found and couldn't be generated",
+                status=400
+            )
+
+        # Обработка имени
+        name_parts = (user_data.get('name', '').split(' ', 1)
+                      if user_data.get('name')
+                      else [user_data['login'], ''])
+        first_name = name_parts[0]
+        last_name = name_parts[1] if len(name_parts) > 1 else ''
+
+        # Поиск или создание пользователя
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            # Генерация уникального username
+            base_username = user_data['login']
+            username = base_username
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}_{counter}"
+                counter += 1
+
+            # Генерация случайного пароля
+            password = ''.join(random.choices(
+                string.ascii_letters + string.digits + string.punctuation,
+                k=20
+            ))
+
+            # Создание пользователя
+            user = User.objects.create_user(
+                email=email,
+                username=username,
+                first_name=first_name,
+                last_name=last_name,
+                password=password
+            )
+        # Аутентификация пользователя
+        login(request, user)
+        token, created = Token.objects.get_or_create(user=user)
+        request.session['auth_token'] = token.key
+        return redirect('http://localhost/api/set_token/')
+
+    except Exception as e:
+        logger.exception("GitHub OAuth error")
+        return HttpResponse(f"Error: {str(e)}", status=500)
+
+
+def set_token_view(request):
+    # Получаем токен из сессии
+    token = request.session.get('auth_token')
+
+    if not token:
+        # Если токена нет, перенаправляем на страницу ошибки
+        return redirect('login_error')  # Создайте эту view
+
+    # Удаляем токен из сессии после использования
+    if 'auth_token' in request.session:
+        del request.session['auth_token']
+
+    # Рендерим страницу, которая установит токен и перенаправит
+    return render(request, 'set_token.html', {
+        'token': token,
+        'redirect_url': 'http://localhost/recipes/'
+    })
 
 
 class UserViewSet(DjoserUserViewSet):

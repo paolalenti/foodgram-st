@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Войти через GitHub</title>
+    <style>
+        .github-login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        .github-button {
+            background-color: #24292e;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            transition: background-color 0.3s;
+        }
+
+        .github-button:hover {
+            background-color: #1a1f24;
+        }
+
+        .github-icon {
+            margin-right: 10px;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="github-login-container">
+        <h1>Войдите в Foodgram через GitHub</h1>
+        <a href="{% url 'github_login' %}">
+            <button class="github-button">
+                <span class="github-icon">🐙</span>
+                Войти через GitHub
+            </button>
+        </a>
+    </div>
+</body>
+</html>

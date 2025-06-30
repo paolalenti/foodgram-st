@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Установка токена</title>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const token = "{{ token }}";
+            const redirectUrl = "{{ redirect_url }}";
+
+            if (token) {
+                localStorage.setItem('token', token);
+
+                if (typeof axios !== 'undefined') {
+                    axios.defaults.headers.common['Authorization'] = `Token ${token}`;
+                }
+
+                window.location.href = redirectUrl;
+            } else {
+                console.error('Token not found');
+                window.location.href = '/error/';
+            }
+        });
+    </script>
+</head>
+<body>
+    <p>Пожалуйста, подождите, идёт установка токена...</p>
+</body>
+</html>

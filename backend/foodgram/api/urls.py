@@ -1,4 +1,5 @@
 from django.urls import include, path
+from django.views.generic import TemplateView
 
 from rest_framework.routers import DefaultRouter
 
@@ -21,4 +22,16 @@ urlpatterns = [
         name='recipe-get-link'
     ),
     path('auth/', include('djoser.urls.authtoken')),
+    path(
+        'login/github/',
+        TemplateView.as_view(template_name='github_login.html'),
+        name='github_login_page'
+    ),
+    path('oauth/github/login/', views.github_login, name='github_login'),
+    path(
+        'oauth/github/callback/',
+        views.github_callback,
+        name='github_callback'
+    ),
+    path('set_token/', views.set_token_view, name='set_token'),
 ]
